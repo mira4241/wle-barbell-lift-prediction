@@ -1,0 +1,71 @@
+---
+title: "Human Activity Recognition with Accelerometers"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(caret)
+library(randomForest)
+library(tidyverse)
+set.seed(1234)
+```
+
+## Introduction
+
+This project uses accelerometer data collected from multiple body locations to predict the manner in which participants performed barbell lifts. The target variable is `classe`, representing the correct or incorrect execution manner.
+
+## Load Data
+
+```{r load-data}
+train_raw <- read.csv("pml-training.csv")
+test_raw <- read.csv("pml-testing.csv")
+```
+
+## Data Cleaning
+
+```{r clean-data}
+# Remove columns with mostly NA values or empty strings
+train_clean <- train_raw %>% select(where(~ mean(!is.na(.)) > 0.95))
+train_clean <- train_clean %>% select_if(~ !any(grepl("[^0-9.-]", as.character(.), perl=TRUE)))
+train_clean$classe <- train_raw$classe
+
+# Drop ID or irrelevant columns
+train_clean <- train_clean %>% select(-c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window), everything())
+```
+
+## Partition Data
+
+```{r split-data}
+set.seed(1234)
+train_index <- createDataPartition(train_clean$classe, p = 0.7, list = FALSE)
+train_set <- train_clean[train_index, ]
+valid_set <- train_clean[-train_index, ]
+```
+
+## Model Training with Random Forest
+
+```{r model-training}
+ctrl <- trainControl(method = "cv", number = 5)
+rf_model <- train(classe ~ ., data = train_set, method = "rf", trControl = ctrl)
+```
+
+## Evaluation
+
+```{r eval-model}
+pred_valid <- predict(rf_model, valid_set)
+confusionMatrix(pred_valid, valid_set$classe)
+```
+
+## Predict Test Set
+
+```{r predict-test}
+test_clean <- test_raw %>% select(names(train_set)[names(train_set) != "classe"])
+pred_test <- predict(rf_model, test_clean)
+pred_test
+```
+
+## Conclusion
+
+The Random Forest model achieved strong accuracy in cross-validation. It was then used to predict 20 test cases as required. All steps are reproducible and suitable for GitHub submission.
